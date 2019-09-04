@@ -16,8 +16,11 @@ module type ARG = sig
 
   type term = S.A.Term.t
 
-  val view_as_bool : term -> term bool_view
-  (** Project the term into the boolean view *)
+  val view_as_bool_for_simp : term -> term bool_view
+  (** Project the term into the boolean view (used by the simplifier) *)
+
+  val view_as_bool_for_subterm_consts : term -> term bool_view
+  (** Project the term into the boolean view (used by the subterm constants) *)
 
   val mk_bool : S.A.Term.state -> term bool_view -> term
   (** Make a term from the given boolean view *)
@@ -81,7 +84,7 @@ module Make(A : ARG) : S with module A = A = struct
     
   let simplify (self:state) (simp:SI.Simplify.t) (t:T.t) : T.t option =
     let tst = self.tst in
-    match A.view_as_bool t with
+    match A.view_as_bool_for_simp t with
     | B_bool _ -> None
     | B_not u when is_true u -> Some (T.bool tst false)
     | B_not u when is_false u -> Some (T.bool tst true)
@@ -105,7 +108,7 @@ module Make(A : ARG) : S with module A = A = struct
       (* directly simplify [a] so that maybe we never will simplify one
          of the branches *)
       let a = SI.Simplify.normalize simp a in
-      begin match A.view_as_bool a with
+      begin match A.view_as_bool_for_simp a with
         | B_bool true -> Some b
         | B_bool false -> Some c
         | _ -> None
@@ -124,10 +127,12 @@ module Make(A : ARG) : S with module A = A = struct
     let t = fresh_term ~pre self Ty.bool in
     mk_lit t
 
+  (* Replace boolean subterms by fresh constants, 
+     which are defined to be equivalent to the subterm in a separate clause. *)
   (* TODO: polarity? *)
   let cnf (self:state) (_si:SI.t) ~mk_lit ~add_clause (t:T.t) : T.t option =
     let rec get_lit (t:T.t) : Lit.t =
-      match A.view_as_bool t with
+      match A.view_as_bool_for_subterm_consts t with
       | B_bool b -> mk_lit (T.bool self.tst b)
       | B_not u ->
         let lit = get_lit u in

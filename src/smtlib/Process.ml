@@ -639,6 +639,8 @@ module Th_bool = Sidekick_th_bool_static.Make(struct
   module S = Solver
   type term = S.A.Term.t
   include Form
+  let view_as_bool_for_simp = Form.view_as_bool
+  let view_as_bool_for_subterm_consts = Form.view_as_bool
 end)
 
 let th_bool : Solver.theory =
